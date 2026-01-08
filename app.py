@@ -4,13 +4,13 @@ import plotly.express as px
 from datetime import datetime
 
 # --- 1. CONFIGURAÇÃO DA PÁGINA (Deve ser o primeiro comando) ---
-st.set_page_config(page_title="CRM Executive 2026", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Dados RHC 2026", layout="wide", initial_sidebar_state="expanded")
 
 # --- 2. SISTEMA DE LOGIN (Bloqueio) ---
 def check_password():
     """Retorna True se o usuário tiver a senha correta."""
     def password_entered():
-        if st.session_state["password"] == "rhc122436":  # <--- TROQUE SUA SENHA AQUI
+        if st.session_state["password"] == "rhc122436":  # <--- 
             st.session_state["password_correct"] = True
             del st.session_state["password"]
         else:
@@ -278,7 +278,7 @@ def fmt_money(val):
     return f"R$ {val/1_000:,.1f}k"
 
 # --- LAYOUT DASHBOARD ---
-st.title("🚀 Command Center: Estratégia & Histórico")
+st.title("🚀 Análise de Dados RHC 2026: Estratégia & Histórico")
 
 # --- DISCLAIMER / LEGENDA ---
 with st.expander("ℹ️  Guia de Leitura: Como interpretar os Status e Perfis (Clique para abrir)", expanded=True):
