@@ -4,13 +4,14 @@ import plotly.express as px
 from datetime import datetime
 
 # --- 1. CONFIGURAÇÃO DA PÁGINA (Deve ser o primeiro comando) ---
-st.set_page_config(page_title="Dados RHC 2026", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Análise de Dados RHC 2026", layout="wide", initial_sidebar_state="expanded")
 
 # --- 2. SISTEMA DE LOGIN (Bloqueio) ---
 def check_password():
     """Retorna True se o usuário tiver a senha correta."""
     def password_entered():
-        if st.session_state["password"] == "rhc122436":  # <--- 
+        # AQUI ESTÁ A SUA SENHA DEFINIDA
+        if st.session_state["password"] == "rhc122436":
             st.session_state["password_correct"] = True
             del st.session_state["password"]
         else:
@@ -85,7 +86,9 @@ st.markdown("""
 @st.cache_data
 def load_data():
     # --- CARREGAMENTO PRINCIPAL (CLIENTES) ---
+    # NOME CORRIGIDO PARA O GITHUB
     file_path = 'todos_30_12_2025.csv'
+    
     try:
         df = pd.read_csv(file_path, sep=';', encoding='utf-8')
     except:
@@ -314,7 +317,7 @@ col2.metric("LTV Médio (Vitalício)", f"R$ {ltv_medio:,.2f}")
 col3.metric("Potencial B2B Oculto", fmt_money(val_b2b), f"{len(b2b_oculto)} Revendedores")
 col4.metric("Dinheiro em Risco (VIP)", fmt_money(val_risco), f"{len(baleias_risco)} Baleias Paradas", delta_color="inverse")
 
-# --- SEÇÃO 2: DETALHAMENTO ANUAL (COM LÓGICA CASCATA CORRIGIDA) ---
+# --- SEÇÃO 2: DETALHAMENTO ANUAL (COM LÓGICA DE PERDA CASCATA) ---
 st.markdown("### 2. Performance Anual Detalhada")
 
 def exibir_ano(ano, df_f):
@@ -331,7 +334,10 @@ def exibir_ano(ano, df_f):
     novos_ano = len(compradores_ano[compradores_ano['Ano_Cadastro'] == ano])
     rec_ano = len(compradores_ano[compradores_ano['Ano_Cadastro'] < ano])
     
-    # --- CÁLCULOS ANO ANTERIOR (Para Deltas) ---
+    # --- CÁLCULOS ANO ANTERIOR (Para Deltas e Base de Churn) ---
+    lost_revenue = 0
+    pct_lost = 0
+    
     if col_prev in df_f.columns:
         compradores_prev = df_f[df_f[col_prev] > 0]
         fat_prev = df_f[col_prev].sum()
@@ -339,25 +345,31 @@ def exibir_ano(ano, df_f):
         tm_prev = compradores_prev[col_prev].mean() if ativos_prev > 0 else 0
         novos_prev = len(compradores_prev[compradores_prev['Ano_Cadastro'] == (ano - 1)])
         rec_prev = len(compradores_prev[compradores_prev['Ano_Cadastro'] < (ano - 1)])
+        
+        # --- CÁLCULO RECEITA PERDIDA (ALOCAÇÃO: "QUEM DO ANO ANTERIOR NÃO ESTÁ AQUI?") ---
+        # Lógica: Na linha do ano 'ano' (ex: 2025), mostramos a perda vinda de 'col_prev' (2024).
+        # A perda considera quem comprou em 'col_prev' (2024) e zerou em 'ano' (2025) e seguintes.
+        
+        if ano > 2020:
+            condicao_risco = (df_f[col_prev] > 0)
+            
+            # Verifica se zerou no ano atual e nos seguintes
+            for y_check in range(ano, 2026): 
+                if str(y_check) in df_f.columns:
+                    condicao_risco = condicao_risco & (df_f[str(y_check)] == 0)
+            
+            df_lost = df_f[condicao_risco]
+            # O valor perdido é o que essa safra gerou no ano ANTERIOR (que não se repetiu)
+            lost_revenue = df_lost[col_prev].sum()
+            
+            if fat_prev > 0:
+                pct_lost = (lost_revenue / fat_prev) * 100
     else:
         fat_prev = ativos_prev = tm_prev = novos_prev = rec_prev = 0
-
-    # --- CÁLCULO RECEITA PERDIDA (LÓGICA CASCATA/CHURN DEFINITIVO) ---
-    lost_revenue = 0
-    pct_lost = 0
-    
-    if ano < 2025:
-        condicao_churn = (df_f[col_str] > 0)
-        for y_future in range(ano + 1, 2026):
-            if str(y_future) in df_f.columns:
-                condicao_churn = condicao_churn & (df_f[str(y_future)] == 0)
-        
-        lost_revenue = df_f.loc[condicao_churn, col_str].sum()
-        if fat_ano > 0:
-            pct_lost = (lost_revenue / fat_ano) * 100
-    else:
         lost_revenue = 0
+        pct_lost = 0
 
+    # Função Auxiliar de Delta
     def calc_delta(atual, anterior):
         if anterior > 0:
             val = (atual - anterior) / anterior * 100
@@ -370,10 +382,11 @@ def exibir_ano(ano, df_f):
     c1.markdown(f"#### {ano}")
     c2.metric("Faturamento", fmt_money(fat_ano), calc_delta(fat_ano, fat_prev))
     
-    if ano < 2025:
-        c3.metric("Receita Perdida (Churn)", fmt_money(lost_revenue), f"{pct_lost:.1f}% do fat. {ano}", delta_color="inverse", help=f"Valor gerado em {ano} por clientes que pararam de comprar depois.")
+    # Exibe Receita Perdida (Cascata) na cor vermelha (normal)
+    if ano > 2020:
+        c3.metric("Receita Perdida", fmt_money(lost_revenue), f"-{pct_lost:.1f}% do ant.", delta_color="normal", help=f"Valor de {ano-1} que não retornou em {ano}.")
     else:
-        c3.metric("Receita Perdida", "---", "---", help="Não aplicável ao ano corrente")
+        c3.metric("Receita Perdida", "---", "---")
         
     c4.metric("Ticket Médio", f"R$ {tm_ano:,.2f}", calc_delta(tm_ano, tm_prev))
     c5.metric("Ativos", ativos_ano, calc_delta(ativos_ano, ativos_prev))
