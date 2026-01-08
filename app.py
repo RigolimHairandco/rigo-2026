@@ -85,7 +85,7 @@ st.markdown("""
 @st.cache_data
 def load_data():
     # --- CARREGAMENTO PRINCIPAL (CLIENTES) ---
-    file_path = 'Todos os clientes - 30-12-2025.csv'
+    file_path = 'Todos_os_clientes_30_12_2025.csv'
     try:
         df = pd.read_csv(file_path, sep=';', encoding='utf-8')
     except:
